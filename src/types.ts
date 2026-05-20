@@ -27,6 +27,37 @@ export interface NBAStandings {
   playoffBound: boolean;
 }
 
+export interface TeamForm {
+  last5Wins: number;
+  last10Wins: number;
+  homeWinPct: number;
+  awayWinPct: number;
+  last5PointDiff: number;
+}
+
+export interface InjuryReport {
+  teamAbbr: string;
+  players: InjuredPlayer[];
+  impactScore: number;
+}
+
+export interface InjuredPlayer {
+  name: string;
+  status: "Out" | "Doubtful" | "Questionable" | "Day-To-Day";
+  position: string;
+  impactWeight: number;
+}
+
+export interface SeriesState {
+  team1: string;
+  team2: string;
+  team1Wins: number;
+  team2Wins: number;
+  gamesPlayed: number;
+  lastWinner: string | null;
+  homeTeamWinStreak: number;
+}
+
 export interface PolymarketMarket {
   conditionId: string;
   questionId: string;
@@ -35,9 +66,12 @@ export interface PolymarketMarket {
   endDate: string;
   active: boolean;
   closed: boolean;
+  acceptingOrders: boolean;
   tokens: PolymarketToken[];
   volumeNum: number;
   liquidityNum: number;
+  minimumTickSize: number;
+  minimumOrderSize: number;
 }
 
 export interface PolymarketToken {
@@ -54,6 +88,7 @@ export interface PolymarketOrderBook {
   best_bid: number;
   best_ask: number;
   spread: number;
+  midpoint: number;
 }
 
 export interface OrderBookLevel {
@@ -67,10 +102,13 @@ export interface TradeOpportunity {
   modelProbability: number;
   marketProbability: number;
   edge: number;
+  expectedValue: number;
   kellyFraction: number;
   suggestedSizeUsd: number;
   signal: "BUY_YES" | "BUY_NO" | "SKIP";
+  confidence: number;
   reasoning: string;
+  factors: string[];
 }
 
 export interface TradeResult {
@@ -90,4 +128,10 @@ export interface StrategyStats {
   dryRunPnl: number;
   startedAt: string;
   lastScanAt: string;
+}
+
+export interface WalletBalance {
+  matic: string;
+  usdc: string;
+  usdcRaw: bigint;
 }
