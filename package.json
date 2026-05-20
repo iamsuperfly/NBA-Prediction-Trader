@@ -1,0 +1,25 @@
+{
+  "name": "nba-prediction-trader",
+  "version": "0.1.0",
+  "description": "AI-powered NBA Playoffs prediction market trading strategy for Polymarket on Polygon",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dry-run": "TRADING_MODE=dry-run tsx src/index.ts",
+    "live": "TRADING_MODE=live tsx src/index.ts",
+    "scan": "tsx src/index.ts --scan-only",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "ethers": "6.16.0",
+    "dotenv": "16.4.7"
+  },
+  "devDependencies": {
+    "tsx": "4.21.0",
+    "typescript": "5.8.2",
+    "@types/node": "22.15.21"
+  }
+}
