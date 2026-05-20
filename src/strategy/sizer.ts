@@ -4,36 +4,44 @@ export function computeEdge(modelProb: number, marketProb: number): number {
   return modelProb - marketProb;
 }
 
+export function computeExpectedValue(
+  modelProb: number,
+  marketProb: number
+): number {
+  if (marketProb <= 0 || marketProb >= 1) return 0;
+  const odds = 1 / marketProb;
+  const netOdds = odds - 1;
+  return modelProb * netOdds - (1 - modelProb);
+}
+
 export function computeKelly(modelProb: number, marketProb: number): number {
   if (marketProb <= 0 || marketProb >= 1) return 0;
+  if (modelProb <= 0 || modelProb >= 1) return 0;
 
   const b = (1 - marketProb) / marketProb;
   const p = modelProb;
   const q = 1 - p;
 
   const fullKelly = (b * p - q) / b;
+  if (fullKelly <= 0) return 0;
 
-  const fractional = Math.max(0, fullKelly) * config.trading.kellyFraction;
-  return Math.min(fractional, 0.25);
+  return Math.min(fullKelly * config.trading.kellyFraction, 0.25);
 }
 
 export function computePositionSize(
   kelly: number,
-  bankrollUsd: number,
-  maxPositionUsd: number
+  bankrollUsd: number
 ): number {
   const raw = kelly * bankrollUsd;
-  return Math.min(raw, maxPositionUsd, bankrollUsd * 0.1);
+  return Math.min(raw, config.trading.maxPositionUsd, bankrollUsd * 0.1);
 }
 
-export function computeExpectedValue(
+export function meetsEvThreshold(
   modelProb: number,
-  marketProb: number,
-  positionUsd: number
-): number {
-  const winPayoff = positionUsd * (1 / marketProb - 1);
-  const lossPayoff = -positionUsd;
-  return modelProb * winPayoff + (1 - modelProb) * lossPayoff;
+  marketProb: number
+): boolean {
+  const ev = computeExpectedValue(modelProb, marketProb);
+  return ev >= config.trading.minEvThreshold;
 }
 
 export function formatOpportunitySummary(
@@ -43,14 +51,13 @@ export function formatOpportunitySummary(
   positionUsd: number
 ): string {
   const edge = computeEdge(modelProb, marketProb);
-  const ev = computeExpectedValue(modelProb, marketProb, positionUsd);
+  const ev = computeExpectedValue(modelProb, marketProb);
+  const evMeetsThreshold = ev >= config.trading.minEvThreshold;
 
   return [
-    `Model: ${(modelProb * 100).toFixed(1)}%`,
-    `Market: ${(marketProb * 100).toFixed(1)}%`,
-    `Edge: ${edge >= 0 ? "+" : ""}${(edge * 100).toFixed(1)}%`,
-    `Kelly%: ${(kelly * 100).toFixed(1)}%`,
-    `Size: $${positionUsd.toFixed(2)}`,
-    `EV: $${ev >= 0 ? "+" : ""}${ev.toFixed(3)}`,
+    `Model ${(modelProb * 100).toFixed(1)}% | Market ${(marketProb * 100).toFixed(1)}%`,
+    `Edge ${edge >= 0 ? "+" : ""}${(edge * 100).toFixed(1)}%`,
+    `EV ${ev >= 0 ? "+" : ""}${(ev * 100).toFixed(1)}% ${evMeetsThreshold ? "✓" : "✗ (below 8%)"}`,
+    `Kelly ${(kelly * 100).toFixed(1)}% | Size $${positionUsd.toFixed(2)}`,
   ].join(" | ");
 }
