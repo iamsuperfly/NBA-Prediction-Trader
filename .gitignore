@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+dist/
+
+# Environment — NEVER commit private keys
+.env
+.env.local
+.env.*.local
+
+# Canon state
+.canon/state.json
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
