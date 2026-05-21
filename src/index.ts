@@ -17,9 +17,20 @@ const scanOnly = process.argv.includes("--scan-only");
 const tradeResults: TradeResult[] = [];
 
 async function printBanner(): Promise<void> {
-  const balance = await getWalletBalance();
-  const mode = config.trading.mode.toUpperCase();
-  const modeIcon = config.trading.mode === "dry-run" ? "🔵 DRY-RUN" : "🔴 LIVE";
+  let maticStr = "N/A";
+  let usdcStr  = "N/A";
+
+  if (!scanOnly && config.trading.mode !== "dry-run") {
+    const bal = await getWalletBalance();
+    maticStr = bal.matic;
+    usdcStr  = bal.usdc;
+  } else if (config.trading.mode === "dry-run") {
+    getWalletBalance()
+      .then((b) => { maticStr = b.matic; usdcStr = b.usdc; })
+      .catch(() => {});
+  }
+
+  const modeIcon = config.trading.mode === "dry-run" ? "DRY-RUN (simulation)" : "LIVE (real money)";
 
   console.log(`
 ╔════════════════════════════════════════════════════════════╗
@@ -28,22 +39,18 @@ async function printBanner(): Promise<void> {
 ╠════════════════════════════════════════════════════════════╣
 ║  Mode     : ${modeIcon.padEnd(46)}║
 ║  Wallet   : ${config.wallet.address.padEnd(46)}║
-║  USDC     : $${balance.usdc.padEnd(45)}║
-║  MATIC    : ${balance.matic.padEnd(46)}║
 ╠════════════════════════════════════════════════════════════╣
 ║  Strategy Parameters                                       ║
 ║  Min EV   : +${(config.trading.minEvThreshold * 100).toFixed(0).padEnd(44)}%║
 ║  Kelly    : ${(config.trading.kellyFraction * 100).toFixed(0).padEnd(44)}% fractional║
 ║  Max size : $${String(config.trading.maxPositionUsd).padEnd(45)}║
 ║  Min liq  : $${String(config.trading.minLiquidityUsd).padEnd(45)}║
-║  Interval : ${(config.trading.scanIntervalMs / 1000).toFixed(0).padEnd(43)}s║
 ╚════════════════════════════════════════════════════════════╝
 `);
 
   if (config.trading.mode === "live") {
-    console.log("⚠️  LIVE TRADING MODE — real USDC will be spent.");
-    console.log("   Ctrl-C to abort. Continuing in 5 seconds...\n");
-    await sleep(5000);
+    console.log("⚠️  LIVE TRADING MODE — real USDC will be spent. Ctrl-C to abort.\n");
+    await sleep(3000);
   }
 }
 
@@ -60,56 +67,52 @@ async function runScan(): Promise<void> {
   stats.opportunitiesFound += opportunities.length;
 
   if (opportunities.length === 0) {
-    console.log("[scanner] No opportunities meet EV ≥ +8% threshold.");
+    console.log("[scanner] No opportunities meet EV ≥ +8% threshold right now.");
     return;
   }
 
   console.log(`\n[scanner] ${opportunities.length} opportunit${opportunities.length === 1 ? "y" : "ies"} found:\n`);
   opportunities.forEach((opp, i) => {
-    const evStr = `EV +${(opp.expectedValue * 100).toFixed(1)}%`;
+    const evStr   = `EV +${(opp.expectedValue * 100).toFixed(1)}%`;
     const sizeStr = `$${opp.suggestedSizeUsd.toFixed(2)}`;
-    const liqStr = `$${(opp.market.liquidityNum / 1000).toFixed(0)}k liq`;
+    const liqStr  = `$${(opp.market.liquidityNum / 1000).toFixed(0)}k liq`;
     console.log(`  ${(i + 1).toString().padStart(2)}. [${opp.signal}] ${opp.market.question.slice(0, 55)}`);
     console.log(`      ${evStr} | Kelly ${(opp.kellyFraction * 100).toFixed(1)}% | Size ${sizeStr} | ${liqStr} | Conf ${(opp.confidence * 100).toFixed(0)}%\n`);
+    opp.factors.slice(0, 2).forEach((f) => console.log(`          ${f}`));
+    console.log("");
   });
 
   if (scanOnly) {
-    console.log("[scan-only] Skipping trade execution.");
+    console.log("[scan-only] Skipping trade execution. Run pnpm dry-run to simulate trades.");
     return;
   }
 
-  const top = opportunities.slice(0, 3);
-  for (const opp of top) {
+  for (const opp of opportunities.slice(0, 3)) {
     if (!opp.market.acceptingOrders && config.trading.mode === "live") {
       console.log(`[trader] Market not accepting orders: ${opp.market.question.slice(0, 50)}`);
       continue;
     }
-
     const result = await executeTrade(opp);
     tradeResults.push(result);
     stats.tradesExecuted++;
-    if (result.simulatedPnl !== undefined) {
-      stats.dryRunPnl += result.simulatedPnl;
-    }
+    if (result.simulatedPnl !== undefined) stats.dryRunPnl += result.simulatedPnl;
   }
 
   printSessionStats();
 }
 
 function printSessionStats(): void {
-  const wins = tradeResults.filter((r) => (r.simulatedPnl ?? 0) > 0).length;
-  const losses = tradeResults.filter((r) => (r.simulatedPnl ?? 0) <= 0 && r.simulatedPnl !== undefined).length;
-
+  const wins   = tradeResults.filter((r) => (r.simulatedPnl ?? 0) > 0).length;
+  const losses = tradeResults.filter((r) => (r.simulatedPnl ?? -1) <= 0 && r.simulatedPnl !== undefined).length;
   console.log(`\n${"─".repeat(62)}`);
   console.log("[stats] Session Summary");
-  console.log(`  Scans           : ${stats.totalScans}`);
-  console.log(`  Opportunities   : ${stats.opportunitiesFound}`);
-  console.log(`  Trades          : ${stats.tradesExecuted}`);
+  console.log(`  Scans        : ${stats.totalScans}`);
+  console.log(`  Opportunities: ${stats.opportunitiesFound}`);
+  console.log(`  Trades       : ${stats.tradesExecuted}`);
   if (config.trading.mode === "dry-run") {
-    console.log(`  Simulated W/L   : ${wins}W / ${losses}L`);
-    console.log(`  Simulated PnL   : ${stats.dryRunPnl >= 0 ? "+" : ""}$${stats.dryRunPnl.toFixed(4)}`);
+    console.log(`  W/L          : ${wins}W / ${losses}L`);
+    console.log(`  Simulated PnL: ${stats.dryRunPnl >= 0 ? "+" : ""}$${stats.dryRunPnl.toFixed(4)}`);
   }
-  console.log(`  Started         : ${stats.startedAt}`);
   console.log(`${"─".repeat(62)}`);
 }
 
@@ -133,7 +136,4 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err) => {
-  console.error("[fatal]", err);
-  process.exit(1);
-});
+main().catch((err) => { console.error("[fatal]", err); process.exit(1); });
