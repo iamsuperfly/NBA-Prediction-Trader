@@ -9,6 +9,7 @@
     "live": "TRADING_MODE=live tsx src/index.ts",
     "scan": "tsx src/index.ts --scan-only",
     "backtest": "tsx src/backtest/index.ts",
+    "report": "tsx src/report/index.ts",
     "typecheck": "tsc --noEmit"
   },
   "engines": {
