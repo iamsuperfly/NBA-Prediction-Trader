@@ -8,6 +8,7 @@
     "dry-run": "TRADING_MODE=dry-run tsx src/index.ts",
     "live": "TRADING_MODE=live tsx src/index.ts",
     "scan": "tsx src/index.ts --scan-only",
+    "backtest": "tsx src/backtest/index.ts",
     "typecheck": "tsc --noEmit"
   },
   "engines": {
